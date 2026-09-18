@@ -1,0 +1,3 @@
+-- Seed exécuté uniquement lors d'un `supabase db reset` (environnement local).
+-- Les données de référence (suppliers) sont créées par les migrations.
+-- Ajouter ici d'éventuelles données de démonstration locales.

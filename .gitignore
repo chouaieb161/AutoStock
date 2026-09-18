@@ -1,0 +1,20 @@
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Next.js / frontend build artifacts
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Supabase local state
+supabase/.temp/
+supabase/.branches/
+
+# OS
+.DS_Store
+Thumbs.db
