@@ -87,7 +87,7 @@ export default function ResultRow({
               <span className="tnum text-price-display text-slate">-- TND</span>
             )}
             <span className="text-label-sm text-slate">
-              TTC <span className="lowercase">par pièce</span>
+              HT <span className="lowercase">par pièce</span>
             </span>
           </div>
           {available ? (

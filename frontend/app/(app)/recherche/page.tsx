@@ -108,7 +108,7 @@ export default async function RecherchePage() {
         <TrustItem
           icon={<CreditCardIcon size={22} />}
           title="En Dinars TND"
-          text="Prix net pro HT & TTC"
+          text="Prix net pro HT"
         />
         <TrustItem
           icon={<TruckIcon size={22} />}

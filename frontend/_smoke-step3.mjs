@@ -31,6 +31,14 @@ const sopraCreds = readFileSync(
 const SOPRA_LOGIN = sopraCreds.match(/^SOPRA_LOGIN=(.*)$/m)[1].trim();
 const SOPRA_PASSWORD = sopraCreds.match(/^SOPRA_PASSWORD=(.*)$/m)[1].trim();
 
+// Identifiants AD (pro.ad-tunisie.com), eux aussi locaux à .env.test.
+const proadCreds = readFileSync(
+  join(ROOT, "..", "connectors", "proad", ".env.test"),
+  "utf8",
+);
+const PROAD_LOGIN = proadCreds.match(/^PROAD_LOGIN=(.*)$/m)[1].trim();
+const PROAD_PASSWORD = proadCreds.match(/^PROAD_PASSWORD=(.*)$/m)[1].trim();
+
 let failed = 0;
 const ok = (l) => console.log("  PASS  " + l);
 const ko = (l, e) => {
@@ -323,6 +331,59 @@ try {
     ko("RLS", "secret_id exposé au rôle anon");
   } else {
     ok("RLS : le client ne voit ni secret_id ni mot de passe");
+  }
+
+  // 9. connexion réelle d'AD (Autodistribution) + résultat réel sur GDB2154
+  const { data: ad } = await admin
+    .from("suppliers")
+    .select("id, code, name")
+    .eq("code", "AD")
+    .maybeSingle();
+  if (!ad) {
+    ko("fournisseur AD", "absent du référentiel");
+  } else {
+    const connectAd = await fetch(`${URL}/functions/v1/connect-supplier`, {
+      method: "POST",
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${si.session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        supplier_id: ad.id,
+        identifier: PROAD_LOGIN,
+        password: PROAD_PASSWORD,
+      }),
+    });
+    const adBody = await connectAd.json();
+    if (connectAd.status !== 200 || !adBody.ok) {
+      ko("connect-supplier (AD)", `status=${connectAd.status}`);
+    } else {
+      ok("connect-supplier : compte AD validé");
+
+      const adRes = await fetch(APP + "/resultats?ref=GDB2154", {
+        headers: authHeaders,
+        redirect: "manual",
+      });
+      const adHtml = norm(await adRes.text());
+      const adChecks = {
+        "fournisseur listé": "Autodistribution",
+        "désignation": "PLAQUETTE DE FREIN AR MERCEDES W205",
+        "lien externe": "pro.ad-tunisie.com",
+      };
+      const missingAd = Object.entries(adChecks)
+        .filter(([, v]) => !adHtml.includes(v))
+        .map(([k]) => k);
+      if (!adRes.ok || missingAd.length > 0) {
+        ko(
+          "GET /resultats?ref=GDB2154 (AD)",
+          `status=${adRes.status} manquants=${missingAd.join(",")}`,
+        );
+        dump("resultats-ad", adHtml);
+      } else {
+        ok("GET /resultats : résultat AD réel affiché (lien pro.ad-tunisie.com)");
+      }
+    }
   }
 } catch (err) {
   ko("script", err.message);
