@@ -2,62 +2,48 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/browser";
 import { ArrowForwardIcon, SearchIcon } from "./icons";
 
 const quickBrands = ["Renault", "Peugeot", "Valeo"];
 
 export default function SearchForm() {
   const router = useRouter();
-  const supabase = createClient();
   const [ref, setRef] = useState("");
   const [marque, setMarque] = useState("");
+  const [designation, setDesignation] = useState("");
+  const [prefix, setPrefix] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  // La référence est le critère principal que les connecteurs fournisseurs
+  // savent appliquer de façon fiable. La marque et la désignation restent des
+  // filtres informatifs. La case « commence par » élargit la recherche aux
+  // références partielles (comme sur le site du grossiste).
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ref.trim() && !marque.trim()) return;
-    setSubmitting(true);
-
     const recordRef = ref.trim();
-    const recordMarque = marque.trim() || null;
+    const recordMarque = marque.trim();
+    const recordDesignation = designation.trim();
+    if (!recordRef) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("tenant_id")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (prof) {
-        await supabase.from("search_history").insert({
-          tenant_id: prof.tenant_id,
-          user_id: user.id,
-          reference: recordRef,
-          marque: recordMarque,
-        });
-      }
-    }
-
+    setSubmitting(true);
     const params = new URLSearchParams();
-    if (recordRef) params.set("ref", recordRef);
+    params.set("ref", recordRef);
     if (recordMarque) params.set("marque", recordMarque);
+    if (recordDesignation) params.set("designation", recordDesignation);
+    if (prefix) params.set("prefix", "1");
     router.push(`/resultats?${params.toString()}`);
-    setSubmitting(false);
   };
 
   return (
     <form onSubmit={submit} className="card flex flex-col gap-4 p-4 md:p-6">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label htmlFor="ref" className="field-label flex items-center gap-2">
-            Référence d&apos;origine (OEM / Réf. Fabricant)
-            <span className="rounded-[4px] bg-surface-chalk px-1.5 py-0.5 text-label-sm text-on-surface-variant">
-              Recommandé
-            </span>
-          </label>
+            <label htmlFor="ref" className="field-label flex items-center gap-2">
+              Référence d&apos;origine (OEM / Réf. Fabricant)
+              <span className="rounded-[4px] bg-surface-chalk px-1.5 py-0.5 text-label-sm text-on-surface-variant">
+                Obligatoire
+              </span>
+            </label>
           <div className="relative">
             <XIconWrapper />
             <input
@@ -69,11 +55,34 @@ export default function SearchForm() {
               autoComplete="off"
             />
           </div>
+          <label
+            htmlFor="prefix"
+            className="mt-3 flex cursor-pointer items-start gap-2"
+          >
+            <input
+              id="prefix"
+              type="checkbox"
+              checked={prefix}
+              onChange={(e) => setPrefix(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#1D4ED8]"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-label-md text-on-surface">
+                Référence commence par
+              </span>
+              <span className="text-body-sm text-on-surface-variant">
+                À cocher si la référence est incomplète.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div>
           <label htmlFor="marque" className="field-label">
             Marque du véhicule ou équipementier
+            <span className="rounded-[4px] bg-surface-chalk px-1.5 py-0.5 text-label-sm text-on-surface-variant">
+              Facultatif
+            </span>
           </label>
           <input
             id="marque"
@@ -98,7 +107,32 @@ export default function SearchForm() {
         </div>
       </div>
 
-      <button type="submit" className="btn btn-secondary self-start md:ml-auto" disabled={submitting}>
+      <div>
+        <label htmlFor="designation" className="field-label">
+          Désignation de la pièce
+          <span className="rounded-[4px] bg-surface-chalk px-1.5 py-0.5 text-label-sm text-on-surface-variant">
+            Facultatif
+          </span>
+        </label>
+        <input
+          id="designation"
+          value={designation}
+          onChange={(e) => setDesignation(e.target.value)}
+          placeholder="Ex : fourchette d'embrayage, pompe à eau..."
+          className="input"
+          autoComplete="off"
+        />
+        <p className="mt-1 text-body-sm text-on-surface-variant">
+          Affine la recherche : la désignation doit être contenue dans le
+          libellé du grossiste.
+        </p>
+      </div>
+
+      <button
+        type="submit"
+        className="btn btn-secondary self-start md:ml-auto"
+        disabled={submitting || !ref.trim()}
+      >
         <SearchIcon size={20} />
         {submitting ? "Recherche en cours..." : "Rechercher la pièce"}
         <ArrowForwardIcon size={20} />

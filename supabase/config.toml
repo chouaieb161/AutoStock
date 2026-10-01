@@ -384,6 +384,15 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# ---------------------------------------------------------------------------
+# Edge Functions du projet (JWT obligatoire : appelées par l'app authentifiée)
+# ---------------------------------------------------------------------------
+[functions.connect-supplier]
+verify_jwt = true
+
+[functions.search-parts]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

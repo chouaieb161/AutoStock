@@ -15,6 +15,8 @@ import {
   ShieldIcon,
   SyncIcon,
 } from "@/components/icons";
+import ConnectSupplierForm from "./connect-form";
+import { connectSupplierAction } from "./actions";
 
 export default function FournisseursView({
   suppliers,
@@ -171,67 +173,17 @@ export default function FournisseursView({
                 Connecter un compte grossiste
               </h2>
               <p className="text-body-sm text-on-surface-variant">
-                La connexion sécurisée d&apos;un compte grossiste sera activée
-                avec les passerelles B2B (étape suivante du projet). Vos
-                identifiants seront alors chiffrés dans Supabase Vault et ne
-                serviront qu&apos;à vos recherches.
+                Vos identifiants sont vérifiés auprès du grossiste puis
+                chiffrés dans Supabase Vault. Ils ne serviront qu&apos;à
+                interroger vos fournisseurs lors des recherches.
               </p>
             </div>
           </div>
 
-          <form className="grid gap-4 md:grid-cols-2">
-            <div className="flex flex-col gap-4">
-              <div>
-                <label htmlFor="grossiste" className="field-label">
-                  Sélectionnez le grossiste
-                </label>
-                <select id="grossiste" className="input appearance-none" disabled defaultValue="">
-                  <option value="">Choisir un grossiste partenaire...</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="ident" className="field-label">
-                  Identifiant B2B
-                </label>
-                <input
-                  id="ident"
-                  placeholder="Ex : client-pro-7842"
-                  className="input"
-                  autoComplete="off"
-                  disabled
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div>
-                <label htmlFor="password" className="field-label">
-                  Mot de passe du compte pro
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••••"
-                  className="input"
-                  autoComplete="off"
-                  disabled
-                />
-                <p className="mt-1.5 flex items-center gap-1 text-label-sm text-slate">
-                  <ShieldIcon size={14} />
-                  Ce mot de passe restera chiffré selon la norme AES-256.
-                </p>
-              </div>
-              <button type="submit" className="btn btn-secondary" disabled>
-                <LockIcon size={18} />
-                Enregistrer et connecter (bientôt)
-              </button>
-            </div>
-          </form>
+          <ConnectSupplierForm
+            suppliers={suppliers}
+            action={connectSupplierAction}
+          />
         </div>
       </section>
 
@@ -245,9 +197,10 @@ export default function FournisseursView({
               Sécurité de vos données garantie
             </h3>
             <p className="text-body-sm text-on-surface-variant">
-              Vos identifiants professionnels sont chiffrés et stockés de façon
-              sécurisée. Ils ne sont utilisés que pour automatiser la recherche
-              de prix et de disponibilité sur votre demande.
+              Vos identifiants professionnels sont chiffrés dans Supabase
+              Vault et ne quittent jamais nos serveurs. Ils ne sont utilisés que
+              pour automatiser la recherche de prix et de disponibilité sur
+              votre demande.
             </p>
           </div>
         </div>

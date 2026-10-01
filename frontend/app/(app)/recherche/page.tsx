@@ -67,6 +67,8 @@ export default async function RecherchePage() {
               const params = new URLSearchParams();
               params.set("ref", s.reference);
               if (s.marque) params.set("marque", s.marque);
+              if (s.designation) params.set("designation", s.designation);
+              if (s.referenceMode === "starts") params.set("prefix", "1");
               return (
                 <li
                   key={s.id}

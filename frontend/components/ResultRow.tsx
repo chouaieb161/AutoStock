@@ -1,81 +1,98 @@
-import { formatTND, type PartResult } from "@/lib/data";
-import type { SupplierReference } from "@/lib/data";
+import { formatTND, type StockStatus } from "@/lib/data";
+import type { SearchPart } from "@/lib/search";
 import StockBadge from "./StockBadge";
 import SupplierAvatar from "./SupplierAvatar";
 import { BadgeCheckIcon, ExternalLinkIcon } from "./icons";
 
+function availabilityDetail(status: StockStatus): string {
+  switch (status) {
+    case "en-stock":
+      return "Disponible immédiatement";
+    case "sur-commande":
+      return "Sous commande chez le fournisseur";
+    case "rupture":
+      return "Rupture de stock";
+    default:
+      return "Réponse non disponible";
+  }
+}
+
 export default function ResultRow({
-  result,
+  part,
   supplier,
+  isBestOffer,
 }: {
-  result: PartResult;
-  supplier?: SupplierReference | null;
+  part: SearchPart;
+  supplier?: { name: string; city: string | null; baseUrl: string | null } | null;
+  isBestOffer: boolean;
 }) {
-  const available =
-    result.availability !== "rupture" &&
-    result.availability !== "indisponible";
-  const name = supplier?.name ?? result.supplierCode;
+  const available = part.disponibilite_app !== "indisponible";
+  const name = supplier?.name ?? part.fournisseur;
   const location = supplier?.city ?? "";
-  const finalizeUrl = supplier?.baseUrl ?? "#";
+  // Le lien profond renvoyé par le connecteur est prioritaire : il pointe
+  // vers la fiche produit. À défaut, on retombe sur la home du grossiste.
+  const href = part.lien_produit || supplier?.baseUrl || "#";
 
   return (
     <article className="card relative p-4">
-      {result.isBestOffer ? (
+      {isBestOffer ? (
         <span className="absolute -top-2.5 left-4 inline-flex items-center gap-1 rounded-full bg-stock-in-bg px-2.5 py-1 text-label-sm text-stock-in-text">
           <BadgeCheckIcon size={14} />
-          Meilleure Offre & En Stock
+          Meilleure Offre
         </span>
       ) : null}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex items-start gap-3 sm:w-56 sm:flex-col sm:gap-2">
-          <SupplierAvatar code={result.supplierCode} name={name} />
+          <SupplierAvatar code={name} name={name} />
           <div className="flex flex-col">
             <span className="text-label-md text-navy">
               {name}
               {location ? ` • ${location}` : ""}
             </span>
-            <span className="text-label-sm text-slate">{result.designation}</span>
+            <span className="text-label-sm text-slate">
+              Réf. {part.reference}
+            </span>
           </div>
         </div>
 
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex h-6 items-center rounded-[4px] bg-surface-chalk px-2 text-label-sm text-on-surface-variant">
-              {result.brand}
+              {part.marque || "—"}
             </span>
-            {result.isVerified ? (
+            {isBestOffer ? (
               <span className="inline-flex items-center gap-1 text-label-sm text-primary">
                 <BadgeCheckIcon size={14} />
-                Vérifié
+                Prix le plus bas
               </span>
             ) : null}
           </div>
-          <p className="text-body-md text-navy">{result.title}</p>
+          <p className="text-body-md text-navy">{part.designation}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <StockBadge status={result.availability} />
+            <StockBadge status={part.disponibilite_app} />
             <span className="text-label-sm text-slate">
-              {result.availabilityDetail}
+              {part.delai || availabilityDetail(part.disponibilite_app)}
             </span>
           </div>
         </div>
 
         <div className="flex flex-row items-end justify-between gap-4 border-t border-border-card pt-3 sm:w-56 sm:flex-col sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
           <div className="flex flex-col">
-            {result.priceMillimes !== null ? (
+            {part.price_millimes !== null ? (
               <span className="tnum text-price-display text-navy">
-                {formatTND(result.priceMillimes)}
+                {formatTND(part.price_millimes)}
               </span>
             ) : (
               <span className="tnum text-price-display text-slate">-- TND</span>
             )}
             <span className="text-label-sm text-slate">
-              TTC <span className="lowercase">{result.unit}</span>
+              TTC <span className="lowercase">par pièce</span>
             </span>
           </div>
           {available ? (
             <a
-              href={finalizeUrl}
+              href={href}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-primary"

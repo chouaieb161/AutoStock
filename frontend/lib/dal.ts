@@ -7,9 +7,11 @@ import { dateLabel } from "@/lib/data";
 import type {
   CartGroupView,
   CartItemView,
+  ConnectOutcome,
   RecentSearchView,
   TenantSupplierView,
 } from "@/lib/data";
+import type { SearchPartsResponse } from "@/lib/search";
 
 export const getSession = cache(async () => {
   const supabase = await createClient();
@@ -37,7 +39,7 @@ export const getProfile = cache(async () => {
   if (!user) return null;
 
   const supabase = await createClient();
-  let { data: profile } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, role, tenant_id")
     .eq("id", user.id)
@@ -151,18 +153,109 @@ export const getSuppliersView = cache(async (): Promise<TenantSupplierView[]> =>
   });
 });
 
+/**
+ * Appelle une Edge Function authentifiée avec la session de l'utilisateur.
+ * Le JWT n'est jamais exposé au navigateur : l'appel passe par le serveur.
+ */
+async function invokeFunction<T>(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<{ data: T | null; error: string | null; code?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return { data: null, error: "UNAUTHENTICATED", code: "UNAUTHENTICATED" };
+  }
+
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data: (data ?? null) as T | null, error: null };
+}
+
+/** Critères de recherche transmis à search-parts. */
+export interface SearchPartsQuery {
+  reference: string;
+  marque?: string;
+  designation?: string;
+  /** "exact" (défaut) ou "starts" : la référence doit commencer par la saisie. */
+  referenceMode?: "exact" | "starts";
+}
+
+/**
+ * Interroge les grossistes connectés du tenant via l'Edge Function.
+ */
+export const searchParts = cache(
+  async (query: SearchPartsQuery): Promise<SearchPartsResponse | null> => {
+    const body: Record<string, string> = { reference: query.reference };
+    if (query.marque) body.marque = query.marque;
+    if (query.designation) body.designation = query.designation;
+    if (query.referenceMode && query.referenceMode !== "exact") {
+      body.reference_mode = query.referenceMode;
+    }
+    const { data, error } = await invokeFunction<SearchPartsResponse>(
+      "search-parts",
+      body,
+    );
+    if (error || !data) {
+      return null;
+    }
+    return data;
+  },
+);
+
+/** Valide puis enregistre les identifiants B2B d'un grossiste. */
+export async function connectSupplier(input: {
+  supplierId: string;
+  identifier: string;
+  password: string;
+}): Promise<ConnectOutcome> {
+  const { data, error } = await invokeFunction<{
+    ok: boolean;
+    status: string;
+    error?: string;
+  }>("connect-supplier", {
+    supplier_id: input.supplierId,
+    identifier: input.identifier,
+    password: input.password,
+  });
+
+  if (error) {
+    return { ok: false, message: "Connexion impossible. Réessayez." };
+  }
+  if (!data) {
+    return { ok: false, message: "Réponse inattendue du serveur." };
+  }
+  if (data.ok) {
+    return { ok: true };
+  }
+  return {
+    ok: false,
+    message:
+      data.error === "CONNEXION_REFUSEE"
+        ? "Identifiants refusés par le grossiste. Vérifiez-les et réessayez."
+        : "Connexion impossible. Réessayez dans un instant.",
+  };
+}
+
 export const getRecentSearches = cache(
   async (limit = 5): Promise<RecentSearchView[]> => {
     const supabase = await createClient();
     const { data } = await supabase
       .from("search_history")
-      .select("id, reference, marque, created_at")
+      .select("id, reference, marque, designation, reference_mode, created_at")
       .order("created_at", { ascending: false })
       .limit(limit);
     return (data ?? []).map((r) => ({
       id: r.id,
       reference: r.reference,
       marque: r.marque,
+      designation: r.designation,
+      referenceMode: (r.reference_mode as "exact" | "starts" | null) ?? null,
       createdAt: r.created_at,
     }));
   },

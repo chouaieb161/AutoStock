@@ -67,6 +67,8 @@ export interface RecentSearchView {
   id: string;
   reference: string;
   marque: string | null;
+  designation: string | null;
+  referenceMode: "exact" | "starts" | null;
   createdAt: string;
 }
 
@@ -95,97 +97,8 @@ export interface CartGroupView {
   items: CartItemView[];
 }
 
-export interface PartResult {
-  id: string;
-  supplierCode: string;
-  brand: string;
-  title: string;
-  designation: string;
-  availability: StockStatus;
-  availabilityDetail: string;
-  priceMillimes: number | null;
-  unit: string;
-  isBestOffer: boolean;
-  isVerified: boolean;
-}
+/** Résultat d'un appel à l'Edge Function `connect-supplier`. */
+export type ConnectOutcome =
+  | { ok: true }
+  | { ok: false; message: string };
 
-export const results: PartResult[] = [
-  {
-    id: "r1",
-    supplierCode: "GP",
-    brand: "VALEO FIRST",
-    title: "Jeu de 4 plaquettes de frein avant avec témoins d'usure intégrés",
-    designation: "Gamaparts Tunis • Magasin Charguia 1",
-    availability: "en-stock",
-    availabilityDetail: "En stock (14 pièces disponibles) • Retrait comptoir immédiat",
-    priceMillimes: 48500,
-    unit: "par jeu",
-    isBestOffer: true,
-    isVerified: true,
-  },
-  {
-    id: "r2",
-    supplierCode: "ST",
-    brand: "FERODO PREMIER",
-    title: "Plaquettes de frein avant de qualité origine",
-    designation: "SOTACAP Ben Arous • Dépôt Z.I. Ben Arous",
-    availability: "en-stock",
-    availabilityDetail: "En stock (6 pièces)",
-    priceMillimes: 54200,
-    unit: "par jeu",
-    isBestOffer: false,
-    isVerified: false,
-  },
-  {
-    id: "r3",
-    supplierCode: "AD",
-    brand: "BOSCH BLUE LINE",
-    title: "Plaquettes frein avant haute performance",
-    designation: "Autodistribution Tunisie (Charguia)",
-    availability: "sur-commande",
-    availabilityDetail: "Sur commande (Délai 24h - Disponible demain 9h)",
-    priceMillimes: 59000,
-    unit: "par jeu",
-    isBestOffer: false,
-    isVerified: false,
-  },
-  {
-    id: "r4",
-    supplierCode: "CP",
-    brand: "TRW LUCAS",
-    title: "Plaquettes frein avant boîte standard",
-    designation: "Comptoir Pièces Sfax • Expédition Grand Tunis",
-    availability: "sur-commande",
-    availabilityDetail: "Sur commande (Délai 48h)",
-    priceMillimes: 62800,
-    unit: "par jeu",
-    isBestOffer: false,
-    isVerified: false,
-  },
-  {
-    id: "r5",
-    supplierCode: "MA",
-    brand: "BREMBO",
-    title: "Plaquettes frein avant Clio IV",
-    designation: "Maghreb Auto Pièces",
-    availability: "rupture",
-    availabilityDetail: "Rupture de stock",
-    priceMillimes: 52000,
-    unit: "Dernier prix connu",
-    isBestOffer: false,
-    isVerified: false,
-  },
-  {
-    id: "r6",
-    supplierCode: "TPM",
-    brand: "-",
-    title: "Réponse non disponible pour le moment",
-    designation: "Tunisie Pièces Mécanique",
-    availability: "indisponible",
-    availabilityDetail: "Fournisseur temporairement indisponible",
-    priceMillimes: null,
-    unit: "Délai dépassé (timeout)",
-    isBestOffer: false,
-    isVerified: false,
-  },
-];
