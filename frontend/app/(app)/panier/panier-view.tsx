@@ -81,6 +81,15 @@ export default function PanierView({ groups }: { groups: CartGroupView[] }) {
     );
   };
 
+  const remove = async (item: CartItemView) => {
+    await supabase.from("tracking_cart_items").delete().eq("id", item.id);
+    setState((prev) =>
+      prev
+        .map((g) => ({ ...g, items: g.items.filter((i) => i.id !== item.id) }))
+        .filter((g) => g.items.length > 0),
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -106,7 +115,7 @@ export default function PanierView({ groups }: { groups: CartGroupView[] }) {
             {formatTND(total)}
           </span>
           <span className="text-label-sm text-slate">
-            TVA & remises pro incluses
+            Prix fournisseurs hors taxes (HT), en Dinar Tunisien
           </span>
         </div>
 
@@ -190,6 +199,7 @@ export default function PanierView({ groups }: { groups: CartGroupView[] }) {
             cart={group}
             checked={orderedIds}
             onToggle={(item) => void toggle(item)}
+            onRemove={(item) => void remove(item)}
           />
         ))}
       </div>

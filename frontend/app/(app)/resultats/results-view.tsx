@@ -23,10 +23,12 @@ export default function ResultsView({
   suppliers,
   payload,
   error,
+  tracked,
 }: {
   suppliers: SupplierReference[];
   payload: SearchPartsResponse | null;
   error: string | null;
+  tracked: ReadonlyMap<string, string>;
 }) {
   const searchParams = useSearchParams();
   const ref = (searchParams.get("ref") ?? "").trim();
@@ -165,20 +167,28 @@ export default function ResultsView({
         </div>
       ) : (
         <div className="flex flex-col gap-6">
-          {parts.map((part, index) => (
-            <ResultRow
-              key={`${part.fournisseur}-${part.reference}-${index}`}
-              part={part}
-              isBestOffer={index === 0}
-              supplier={supplierByName.get(part.fournisseur.toUpperCase())}
-            />
-          ))}
+          {parts.map((part, index) => {
+            const supplier = supplierByName.get(part.fournisseur.toUpperCase());
+            return (
+              <ResultRow
+                key={`${part.fournisseur}-${part.reference}-${index}`}
+                part={part}
+                isBestOffer={index === 0}
+                supplier={supplier}
+                trackedId={
+                  supplier ? tracked.get(`${supplier.id}|${part.reference}`) : undefined
+                }
+              />
+            );
+          })}
 
           <p className="flex items-center justify-center gap-2 text-label-sm text-slate">
             <InboxIcon size={16} />
             Le bouton &laquo;&nbsp;Commander&nbsp;&raquo; ouvre la fiche produit
-            chez le fournisseur. Aucune commande n&apos;est envoyée
-            automatiquement.
+            chez le fournisseur. Cochez &laquo;&nbsp;Ajouter au suivi&nbsp;&raquo;
+            uniquement quand vous avez vraiment mis l&apos;article dans votre
+            panier fournisseur&nbsp;: il sera regroupé dans la page
+            &laquo;&nbsp;Mes articles&nbsp;&raquo; en fin de journée.
           </p>
         </div>
       )}

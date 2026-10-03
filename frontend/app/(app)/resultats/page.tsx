@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { getSuppliersCatalogue, searchParts } from "@/lib/dal";
+import {
+  getSuppliersCatalogue,
+  getTrackedByKey,
+  searchParts,
+} from "@/lib/dal";
 import { searchErrorLabel } from "@/lib/search";
 import ResultsView from "./results-view";
 
@@ -28,7 +32,14 @@ export default async function ResultatsPage({
   const suppliers = await getSuppliersCatalogue();
 
   if (!reference) {
-    return <ResultsView suppliers={suppliers} payload={null} error={null} />;
+    return (
+      <ResultsView
+        suppliers={suppliers}
+        payload={null}
+        error={null}
+        tracked={new Map<string, string>()}
+      />
+    );
   }
 
   const payload = await searchParts({
@@ -38,6 +49,10 @@ export default async function ResultatsPage({
     referenceMode: prefix === "1" ? "starts" : "exact",
   });
 
+  const tracked = payload?.results?.length
+    ? await getTrackedByKey(payload.results.map((p) => p.reference))
+    : new Map<string, string>();
+
   return (
     <ResultsView
       suppliers={suppliers}
@@ -45,6 +60,7 @@ export default async function ResultatsPage({
       error={
         payload ? null : searchErrorLabel("SEARCH_FAILED")
       }
+      tracked={tracked}
     />
   );
 }

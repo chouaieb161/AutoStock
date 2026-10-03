@@ -334,6 +334,7 @@ try {
   }
 
   // 9. connexion réelle d'AD (Autodistribution) + résultat réel sur GDB2154
+  let adId = null;
   const { data: ad } = await admin
     .from("suppliers")
     .select("id, code, name")
@@ -342,6 +343,7 @@ try {
   if (!ad) {
     ko("fournisseur AD", "absent du référentiel");
   } else {
+    adId = ad.id;
     const connectAd = await fetch(`${URL}/functions/v1/connect-supplier`, {
       method: "POST",
       headers: {
@@ -384,6 +386,148 @@ try {
         ok("GET /resultats : résultat AD réel affiché (lien pro.ad-tunisie.com)");
       }
     }
+  }
+
+  // 10. panier de suivi : coche manuelle depuis /resultats -> /panier
+  if (adId) {
+    const trackingRef = "GDB2154";
+    const trackingBody = {
+      supplierId: adId,
+      reference: trackingRef,
+      designation: "PLAQUETTE DE FREIN AR MERCEDES W205",
+      marque: "MERCEDES",
+      prix_millimes: 108749,
+      lien_produit: "https://pro.ad-tunisie.com/produit/gdb2154",
+    };
+    const add = await fetch(APP + "/resultats/tracking", {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify(trackingBody),
+    });
+    const addBody = await add.json();
+    if (add.status !== 200 || !addBody.ok || !addBody.id) {
+      ko("POST /resultats/tracking (ajout)", `status=${add.status}`);
+    } else {
+      ok("POST /resultats/tracking : article ajouté au suivi");
+    }
+
+    const dup = await fetch(APP + "/resultats/tracking", {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify(trackingBody),
+    });
+    const dupBody = await dup.json();
+    if (!dupBody.ok || dupBody.already !== true) {
+      ko("POST /resultats/tracking (anti-doublon)", JSON.stringify(dupBody));
+    } else {
+      ok("POST /resultats/tracking : doublon ignoré (already=true)");
+    }
+
+    const { count: trackedCount } = await admin
+      .from("tracking_cart_items")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("supplier_id", adId)
+      .eq("reference", trackingRef)
+      .eq("status", "pending");
+    if (trackedCount !== 1) {
+      ko("anti-doublon (DB)", `count=${trackedCount}`);
+    } else {
+      ok("anti-doublon vérifié en base (1 seule ligne pending)");
+    }
+
+    const cart = await fetch(APP + "/panier", {
+      headers: authHeaders,
+      redirect: "manual",
+    });
+    const cartHtml = norm(await cart.text());
+    const cartChecks = {
+      fournisseur: "Autodistribution",
+      référence: "GDB2154",
+      désignation: "PLAQUETTE DE FREIN AR MERCEDES W205",
+      groupe: "En attente de finalisation",
+      retirer: "Retirer",
+      finaliser: "Aller finaliser chez Autodistribution",
+    };
+    const missingCart = Object.entries(cartChecks)
+      .filter(([, v]) => !cartHtml.includes(v))
+      .map(([k]) => k);
+    if (!cart.ok || missingCart.length > 0) {
+      ko(
+        "GET /panier (attente)",
+        `status=${cart.status} manquants=${missingCart.join(",")}`,
+      );
+      dump("panier-attente", cartHtml);
+    } else {
+      ok("GET /panier : article groupé par fournisseur, bouton Retirer présent");
+    }
+
+    // Simulation du toggle « Marquer comme commandé » (appel RLS identique au client)
+    await admin
+      .from("tracking_cart_items")
+      .update({ status: "ordered", ordered_at: new Date().toISOString() })
+      .eq("tenant_id", tenantId)
+      .eq("supplier_id", adId);
+
+    const cartDone = await fetch(APP + "/panier", {
+      headers: authHeaders,
+      redirect: "manual",
+    });
+    const doneHtml = norm(await cartDone.text());
+    if (
+      !cartDone.ok ||
+      !doneHtml.includes("Panier commandé") ||
+      !doneHtml.includes("Commandé")
+    ) {
+      ko("GET /panier (commandé)", `status=${cartDone.status}`);
+      dump("panier-commande", doneHtml);
+    } else {
+      ok("GET /panier : article marqué commandé (badge + statut)");
+    }
+
+    const del = await fetch(
+      APP + "/resultats/tracking?id=" + encodeURIComponent(addBody.id),
+      { method: "DELETE", headers: authHeaders },
+    );
+    const delBody = await del.json();
+    if (!delBody.ok) {
+      ko("DELETE /resultats/tracking", `status=${del.status}`);
+    } else {
+      ok("DELETE /resultats/tracking : article retiré du suivi");
+    }
+
+    const { count: afterDelete } = await admin
+      .from("tracking_cart_items")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("supplier_id", adId);
+    if (afterDelete !== 0) {
+      ko("suppression (DB)", `count=${afterDelete}`);
+    } else {
+      ok("suppression vérifiée en base (0 ligne)");
+    }
+
+    const cartEmpty = await fetch(APP + "/panier", {
+      headers: authHeaders,
+      redirect: "manual",
+    });
+    const emptyHtml = norm(await cartEmpty.text());
+    if (!cartEmpty.ok || !emptyHtml.includes("Aucun article en attente")) {
+      ko("GET /panier (vide)", `status=${cartEmpty.status}`);
+      dump("panier-vide", emptyHtml);
+    } else {
+      ok("GET /panier : état vide après retrait");
+    }
+  }
+
+  // 10b. RLS : le rôle anon ne doit rien voir dans tracking_cart_items
+  const { data: anonTracking } = await anon
+    .from("tracking_cart_items")
+    .select("id");
+  if ((anonTracking ?? []).length > 0) {
+    ko("RLS tracking", `${anonTracking.length} ligne(s) lue(s) par anon`);
+  } else {
+    ok("RLS tracking : le rôle anon ne voit aucune ligne de suivi");
   }
 } catch (err) {
   ko("script", err.message);

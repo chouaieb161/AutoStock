@@ -13,16 +13,19 @@ import {
   ClockIcon,
   ExternalLinkIcon,
   InboxIcon,
+  XIcon,
 } from "./icons";
 
 export default function SupplierCartCard({
   cart,
   checked,
   onToggle,
+  onRemove,
 }: {
   cart: CartGroupView;
   checked: ReadonlySet<string>;
   onToggle: (item: CartItemView) => void;
+  onRemove: (item: CartItemView) => void;
 }) {
   const pending = cart.items.filter((i) => i.status === "pending").length;
   const allOrdered = pending === 0;
@@ -151,6 +154,14 @@ export default function SupplierCartCard({
                     {isChecked ? "Remettre en attente" : "Marquer comme commandé"}
                     {isChecked ? <CheckIcon size={16} /> : null}
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(item)}
+                    className="inline-flex h-8 items-center gap-1 rounded-[4px] px-2 text-label-sm text-slate transition-colors hover:bg-surface-0 hover:text-stock-rupture-text"
+                  >
+                    <XIcon size={14} />
+                    Retirer
+                  </button>
                 </div>
               </li>
             );

@@ -177,7 +177,6 @@ export class SopraConnector {
   #jar = new Map<string, string>();
   #accueilHtml = "";
   #catalogueUrl = "";
-  #lienProduit = "";
 
   constructor(private baseUrl: string) {}
 
@@ -276,7 +275,6 @@ export class SopraConnector {
     const catalogueAction = formAction(html);
     if (!catalogueAction) throw new Error("SOPRA: action catalogue introuvable");
     this.#catalogueUrl = this.#resolve(catalogueAction);
-    this.#lienProduit = this.#catalogueUrl;
     return html;
   }
 
@@ -361,7 +359,9 @@ export class SopraConnector {
             : row.disponibilite === "indisponible"
             ? "indisponible"
             : "",
-        lien_produit: this.#lienProduit || this.baseUrl,
+        // Pas d'URL de fiche partageable sur soprab2b.tn (jetons liés à la
+        // session navigateur) : « Commander » ouvre le site d'entrée.
+        lien_produit: this.baseUrl,
       }));
   }
 }

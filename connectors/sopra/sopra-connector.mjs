@@ -82,7 +82,7 @@ export class SopraClient {
 
   normalize(html, catalogueHtml) {
     const { rows } = parseResults(html);
-    const lien = formAction(catalogueHtml);
+    // Pas d'URL de fiche partageable (jetons de session) : lien vers le site.
     return rows.map((r) => ({
       reference: r.reference,
       designation: r.designation,
@@ -92,7 +92,7 @@ export class SopraClient {
       prix: toNumber(r.prix),
       devise: "TND",
       delai: DELAI[r.disponibilite] ?? "",
-      lien_produit: lien ? new URL(lien, BASE).href : BASE,
+      lien_produit: BASE,
     }));
   }
 }

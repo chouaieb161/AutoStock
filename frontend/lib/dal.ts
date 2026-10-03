@@ -270,6 +270,41 @@ export const getConnectedSuppliersCount = cache(async () => {
   return count ?? 0;
 });
 
+/** Id du tenant de l'utilisateur courant (null si non provisionné). */
+export const getTenantId = cache(async (): Promise<string | null> => {
+  const user = await getSession();
+  if (!user) return null;
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  return profile?.tenant_id ?? null;
+});
+
+/**
+ * État « déjà suivi » d'une liste de références : clé
+ * `${supplier_id}|${reference}` -> id de la ligne (pending ou ordered).
+ */
+export const getTrackedByKey = cache(
+  async (refs: string[]): Promise<Map<string, string>> => {
+    const unique = [...new Set(refs.filter(Boolean))];
+    const map = new Map<string, string>();
+    if (unique.length === 0) return map;
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("tracking_cart_items")
+      .select("id, supplier_id, reference")
+      .neq("status", "received")
+      .in("reference", unique);
+    for (const row of data ?? []) {
+      map.set(`${row.supplier_id}|${row.reference}`, row.id);
+    }
+    return map;
+  },
+);
+
 export const getCartGroups = cache(async (): Promise<CartGroupView[]> => {
   const supabase = await createClient();
   const [{ data: items }, { data: catalogue }] = await Promise.all([
