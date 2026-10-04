@@ -39,6 +39,22 @@ const proadCreds = readFileSync(
 const PROAD_LOGIN = proadCreds.match(/^PROAD_LOGIN=(.*)$/m)[1].trim();
 const PROAD_PASSWORD = proadCreds.match(/^PROAD_PASSWORD=(.*)$/m)[1].trim();
 
+// Identifiants FADPRO (fadpro.tn), locaux à .env.test.
+const fadproCreds = readFileSync(
+  join(ROOT, "..", "connectors", "fadpro", ".env.test"),
+  "utf8",
+);
+const FADPRO_LOGIN = fadproCreds.match(/^FADPRO_LOGIN=(.*)$/m)[1].trim();
+const FADPRO_PASSWORD = fadproCreds.match(/^FADPRO_PASSWORD=(.*)$/m)[1].trim();
+
+// Identifiants LAHIANI (lahianipa.com), locaux à .env.test.
+const lahianiCreds = readFileSync(
+  join(ROOT, "..", "connectors", "lahianipa", ".env.test"),
+  "utf8",
+);
+const LAHIANI_LOGIN = lahianiCreds.match(/^LAHIANIPA_LOGIN=(.*)$/m)[1].trim();
+const LAHIANI_PASSWORD = lahianiCreds.match(/^LAHIANIPA_PASSWORD=(.*)$/m)[1].trim();
+
 let failed = 0;
 const ok = (l) => console.log("  PASS  " + l);
 const ko = (l, e) => {
@@ -384,6 +400,136 @@ try {
         dump("resultats-ad", adHtml);
       } else {
         ok("GET /resultats : résultat AD réel affiché (lien pro.ad-tunisie.com)");
+      }
+    }
+  }
+
+  // 9b. connexion réelle de FADPRO (fadpro.tn) + résultat réel sur 165004357R
+  const { data: fad } = await admin
+    .from("suppliers")
+    .select("id, code, name")
+    .eq("code", "FAD")
+    .maybeSingle();
+  if (!fad) {
+    ko("fournisseur FAD", "absent du référentiel");
+  } else {
+    const connectFad = await fetch(`${URL}/functions/v1/connect-supplier`, {
+      method: "POST",
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${si.session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        supplier_id: fad.id,
+        identifier: FADPRO_LOGIN,
+        password: FADPRO_PASSWORD,
+      }),
+    });
+    const fadBody = await connectFad.json();
+    if (connectFad.status !== 200 || !fadBody.ok) {
+      ko("connect-supplier (FADPRO)", `status=${connectFad.status}`);
+    } else {
+      ok("connect-supplier : compte FADPRO validé");
+
+      const fadRes = await fetch(APP + "/resultats?ref=165004357R", {
+        headers: authHeaders,
+        redirect: "manual",
+      });
+      const fadHtml = norm(await fadRes.text());
+      const fadChecks = {
+        "fournisseur listé": "FADPRO",
+        "désignation": "BOITIER FILTRE A AIR",
+        "lien externe": "fadpro.tn",
+      };
+      const missingFad = Object.entries(fadChecks)
+        .filter(([, v]) => !fadHtml.includes(v))
+        .map(([k]) => k);
+      if (!fadRes.ok || missingFad.length > 0) {
+        ko(
+          "GET /resultats?ref=165004357R (FADPRO)",
+          `status=${fadRes.status} manquants=${missingFad.join(",")}`,
+        );
+        dump("resultats-fadpro", fadHtml);
+      } else {
+        ok("GET /resultats : résultat FADPRO réel affiché (lien fadpro.tn)");
+      }
+    }
+  }
+
+  // 9c. connexion réelle de LAHIANI (lahianipa.com) + résultat réel sur 13780M69R00
+  const { data: lhi } = await admin
+    .from("suppliers")
+    .select("id, code, name")
+    .eq("code", "LHI")
+    .maybeSingle();
+  if (!lhi) {
+    ko("fournisseur LHI", "absent du référentiel");
+  } else {
+    const connectLhi = await fetch(`${URL}/functions/v1/connect-supplier`, {
+      method: "POST",
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${si.session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        supplier_id: lhi.id,
+        identifier: LAHIANI_LOGIN,
+        password: LAHIANI_PASSWORD,
+      }),
+    });
+    const lhiBody = await connectLhi.json();
+    if (connectLhi.status !== 200 || !lhiBody.ok) {
+      ko("connect-supplier (LAHIANI)", `status=${connectLhi.status}`);
+    } else {
+      ok("connect-supplier : compte LAHIANI validé");
+
+      const lhiRes = await fetch(APP + "/resultats?ref=13780M69R00", {
+        headers: authHeaders,
+        redirect: "manual",
+      });
+      const lhiHtml = norm(await lhiRes.text());
+      const lhiChecks = {
+        "fournisseur listé": "Lahiani Pièces Auto",
+        "désignation": "FILTRE A AIR WAGON-R",
+        "lien externe": "lahianipa.com",
+      };
+      const missingLhi = Object.entries(lhiChecks)
+        .filter(([, v]) => !lhiHtml.includes(v))
+        .map(([k]) => k);
+      if (!lhiRes.ok || missingLhi.length > 0) {
+        ko(
+          "GET /resultats?ref=13780M69R00 (LAHIANI)",
+          `status=${lhiRes.status} manquants=${missingLhi.join(",")}`,
+        );
+        dump("resultats-lahiani", lhiHtml);
+      } else {
+        ok("GET /resultats : résultat LAHIANI réel affiché (lien lahianipa.com)");
+      }
+
+      // Même référence, deux articles distincts (marque/dispo/prix différents) :
+      // la dédup composite doit conserver les deux lignes LAHIANI.
+      const dupRes = await fetch(APP + "/resultats?ref=1881411051", {
+        headers: authHeaders,
+        redirect: "manual",
+      });
+      const dupHtml = norm(await dupRes.text());
+      const dupChecks = {
+        "ligne GENUINE PARTS": "BOUGIE KIA RIO PICANTO MAZDA 3 HYUNDAI",
+        "ligne KIA": "BOUGIE RIO 2010 ESSENCE",
+      };
+      const missingDup = Object.entries(dupChecks)
+        .filter(([, v]) => !dupHtml.includes(v))
+        .map(([k]) => k);
+      if (!dupRes.ok || missingDup.length > 0) {
+        ko(
+          "GET /resultats?ref=1881411051 (LAHIANI multi-lignes)",
+          `status=${dupRes.status} manquants=${missingDup.join(",")}`,
+        );
+        dump("resultats-lahiani-dup", dupHtml);
+      } else {
+        ok("GET /resultats : les 2 articles LAHIANI de même référence affichés");
       }
     }
   }
